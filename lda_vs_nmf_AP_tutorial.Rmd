@@ -1,6 +1,9 @@
 ---
-title: "Topic Modeling in R: LDA vs NMF with Associated Press"
+title: 'Topic Modeling in R: LDA vs NMF with Associated Press'
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
   html_document:
     toc: true
     toc_depth: 3
@@ -22,7 +25,7 @@ We will:
 3. Fit **LDA on counts** and **NMF (Frobenius loss) on TF–IDF** computed from the same counts.
 4. Inspect **top words** per topic.
 5. Compute two **model-agnostic** metrics:
-   - **UMass coherence** (higher/less negative ≈ better internal consistency).
+   - **UMass coherence** (higher/less negative $\approx$ better internal consistency).
    - **Mean Jensen–Shannon distance (JSD)** between topics (higher = more distinct).
 
 ---
@@ -68,7 +71,7 @@ random_state <- 0         # reproducibility
 
 # Data
 
-## Load the Associated Press corpus (pure R)
+## Load the Associated Press corpus
 
 `topicmodels` ships a preprocessed **DocumentTermMatrix** named `AssociatedPress` (AP).
 
@@ -89,6 +92,7 @@ We build **one** filtered vocabulary and use it for both models:
 - **TF–IDF** (computed from those same counts) → input to **NMF**
 
 Filtering steps:
+
 - Remove **rare** terms (`min_df`) and **overly common** terms (`max_df_prop`).
 - Cap to the `max_features` most frequent terms.
 - Keep everything sparse.
@@ -121,6 +125,7 @@ dim(dtm_filt)
 ## Build TF–IDF (sublinear TF + L2 row norm)
 
 We approximate scikit-learn’s default TF–IDF:
+
 - **TF:** sublinear scaling `log1p(count)`
 - **IDF:** `log((1 + N) / (1 + df)) + 1`
 - **Normalize:** L2 per document (row)
@@ -199,7 +204,8 @@ We use Euclidean (Frobenius) loss via the Lee–Seung updates. This mirrors the 
 
 ```{r nmf, message=FALSE}
 set.seed(random_state)
-nmf_model <- nmf(as.matrix(V_tfidf), rank = n_topics, method = "lee", nrun = 1)
+nmf_model <- nmf(as.matrix(V_counts), rank = n_topics,
+                 method = "brunet", nrun = 1, seed = "nndsvd")
 nmf_model
 ```
 
@@ -244,7 +250,7 @@ for (i in seq_along(tw_nmf)) cat(sprintf("Topic #%d:\n%s\n\n", i-1, tw_nmf[[i]])
 ## UMass Coherence
 
 **Question:** Do a topic’s top words tend to co-occur in the same documents?  
-We compute a log-based co-occurrence score across top-word pairs (less negative ≈ better).
+We compute a log-based co-occurrence score across top-word pairs (less negative $\approx$ better).
 
 ```{r coherence, message=FALSE}
 umass_coherence <- function(phi, dtm_counts, topn = 20, eps = 1e-12) {
@@ -333,15 +339,15 @@ cat(sprintf("NMF  coherence (UMass): %.4f   | separation (JSD): %.4f\n", nmf_coh
 
 # Interpretation
 
-- **UMass coherence**: Do a topic’s top words tend to appear together in documents? (higher/less negative ≈ better).  
+- **UMass coherence**: Do a topic’s top words tend to appear together in documents? (higher/less negative $\approx$ better).  
 - **Mean JSD**: How different are the topics from each other overall? (higher = more distinct).  
 - **Typical outcome**: LDA often has slightly better coherence; NMF (with narrower topics) often has higher separation.  
 - Maintain a **shared vocabulary** to keep comparisons fair.
 
 **UMass coherence** (higher/less-negative is better):
 
-- LDA: **−1.794** pretty reasonable on AP; LDA topics (markets, USSR, Gulf War, courts, etc.) are visibly coherent.
-- NMF: **−8.958** very low coherence; the top words read “spiky/odd” and don’t co-occur much in documents. That’s typical when NMF is run with **Euclidean loss on TF–IDF**: it emphasizes rare/idiosyncratic terms rather than co-occurring ones.
+- LDA: **-1.794** pretty reasonable on AP; LDA topics (markets, USSR, Gulf War, courts, etc.) are visibly coherent.
+- NMF: **-8.958** very low coherence; the top words read “spiky/odd” and don’t co-occur much in documents. That’s typical when NMF is run with **Euclidean loss on TF–IDF**: it emphasizes rare/idiosyncratic terms rather than co-occurring ones.
 
 **JSD separation** (higher = topics more dissimilar as distributions):
 
